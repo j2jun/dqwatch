@@ -2,11 +2,12 @@
 import json
 import os
 import re
+import threading
 import urllib.parse
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from dqwatch import fetch, llm, meta, rules, schema
@@ -34,6 +35,8 @@ def _num(v: str):
 def _rule_from_form(form) -> dict:
     if form.get("rule_json"):
         rule = json.loads(form["rule_json"])
+        if not isinstance(rule, dict):
+            raise ValueError("That check isn't valid.")
         rule.pop("why", None)
         rule.pop("id", None)
         return rule
@@ -70,8 +73,26 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
     app = FastAPI(title="dqwatch")
     app.state.llm_cfg, app.state.complete = llm_cfg, complete
 
+    local = threading.local()
+
     def db():
-        return meta.connect(meta_path)
+        # one connection per worker thread, reused across requests
+        if getattr(local, "con", None) is None:
+            local.con = meta.connect(meta_path)
+        return local.con
+
+    @app.middleware("http")
+    async def same_origin_posts(request: Request, call_next):
+        """No login exists, so refuse form posts that come from another site (CSRF)."""
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            origin = request.headers.get("origin") or request.headers.get("referer")
+            if origin and urllib.parse.urlparse(origin).netloc != request.headers.get("host"):
+                return PlainTextResponse("Cross-site request refused.", status_code=403)
+        return await call_next(request)
+
+    @app.exception_handler(meta.NotFound)
+    async def not_found(request: Request, exc: meta.NotFound):
+        return HTMLResponse("<p>That source doesn't exist. <a href='/'>Back to the dashboard</a></p>", 404)
 
     def page(request, name, status_code=200, **ctx):
         ctx.setdefault("hosted", llm.is_hosted(llm_cfg))
@@ -97,9 +118,10 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
         return page(request, "sources_new.html", error="", form={})
 
     @app.post("/sources/preview", response_class=HTMLResponse)
-    async def preview_source(request: Request, name: str = Form(...), kind: str = Form(...),
-                             location: str = Form(""), lat: str = Form(""), lon: str = Form(""),
-                             upload: UploadFile | None = None):
+    def preview_source(request: Request, name: str = Form(...), kind: str = Form(...),
+                       location: str = Form(""), lat: str = Form(""), lon: str = Form(""),
+                       upload: UploadFile | None = None):
+        # sync on purpose: fetching can take up to 30 s and must not block other requests
         form = {"name": name, "kind": kind, "location": location, "lat": lat, "lon": lon}
 
         def fail(msg):
@@ -114,7 +136,7 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
                 fname = os.path.basename(upload.filename)
                 if not fname.lower().endswith(".csv"):
                     return fail("Please upload a .csv file.")
-                (folder / fname).write_bytes(await upload.read())
+                (folder / fname).write_bytes(upload.file.read())
         elif kind == "api":
             try:
                 location = fetch.open_meteo_url(float(lat), float(lon))
@@ -175,6 +197,8 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
             rule = rules.validate_rule(_rule_from_form(await request.form()), src.columns)
         except ValueError as e:
             return source_page(request, sid, error=str(e))
+        except (TypeError, AttributeError):
+            return source_page(request, sid, error="That check isn't valid.")
         meta.add_rule(con, sid, rule)
         return RedirectResponse(f"/sources/{sid}", status_code=303)
 

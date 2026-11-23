@@ -107,3 +107,38 @@ def test_create_revalidates_location(ctx, kind, location):
         "name": "O", "kind": kind, "location": location, "write_mode": "append", "key_column": "",
         "schedule_minutes": "60", "col_name": ["id"], "col_type": ["integer"], "sample": "[]"})
     assert meta.list_sources(meta.connect(ctx["meta"])) == []
+
+
+@pytest.mark.parametrize("payload", ['[1, 2]', '"x"', '{"type": "not_null", "column": ["id"]}', '{bad'])
+def test_crafted_rule_json_is_a_form_error(ctx, payload):
+    sid = _source(ctx)
+    r = ctx["client"].post(f"/sources/{sid}/rules", data={"rule_json": payload})
+    assert r.status_code == 200 and 'class="error"' in r.text
+    assert meta.list_rules(meta.connect(ctx["meta"]), sid) == []
+
+
+def test_missing_source_is_404(ctx):
+    assert ctx["client"].get("/sources/999").status_code == 404
+    assert ctx["client"].post("/sources/999/rules", data={"type": "unique", "column": "id"}).status_code == 404
+
+
+def test_preview_does_not_block_event_loop(ctx):
+    import inspect
+    route = next(r for r in ctx["client"].app.routes if getattr(r, "path", "") == "/sources/preview")
+    assert not inspect.iscoroutinefunction(route.endpoint)  # sync → runs in the threadpool
+
+
+def test_cross_site_post_rejected(ctx):
+    sid = _source(ctx)
+    r = ctx["client"].post(f"/sources/{sid}/rules", data={"type": "unique", "column": "id"},
+                           headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403
+    assert meta.list_rules(meta.connect(ctx["meta"]), sid) == []
+    r = ctx["client"].post(f"/sources/{sid}/rules", data={"type": "unique", "column": "id"},
+                           headers={"Origin": "http://testserver"})
+    assert r.status_code == 200 and len(meta.list_rules(meta.connect(ctx["meta"]), sid)) == 1
+
+
+def test_db_connection_reused_per_thread(ctx):
+    db = ctx["client"].app.state.db
+    assert db() is db()

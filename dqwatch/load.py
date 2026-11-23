@@ -17,8 +17,11 @@ def ensure_table(con, source: Source):
 
 def _insert_sql(source: Source, where: str) -> str:
     names = ", ".join(qi(c.name) for c in source.columns)
+    # append: identical rows inside one file collapse to the first one
+    qualify = " QUALIFY row_number() OVER (PARTITION BY _row_hash ORDER BY _row_idx) = 1" \
+        if source.write_mode == "append" else ""
     return (f"INSERT INTO {table_name(source.id)} ({names}, _raw, _row_hash, _batch_id, _loaded_at) "
-            f"SELECT {names}, _raw, _row_hash, ?, ? FROM staging {where}")
+            f"SELECT {names}, _raw, _row_hash, ?, ? FROM staging {where}{qualify}")
 
 
 def load(con, source: Source, batch_id: str, now: datetime) -> int:

@@ -44,7 +44,7 @@ def is_hosted(cfg: LlmConfig) -> bool:
     return urllib.parse.urlparse(cfg.base_url).hostname not in LOCAL_HOSTS
 
 
-def complete(messages: list[dict], cfg: LlmConfig, timeout: float = 60) -> str:
+def complete(messages: list[dict], cfg: LlmConfig, timeout: float = 120) -> str:  # cold Ollama loads slowly
     req = urllib.request.Request(
         cfg.base_url.rstrip("/") + "/chat/completions",
         data=json.dumps({"model": cfg.model, "messages": messages}).encode(),
@@ -71,15 +71,16 @@ def system_prompt(source: Source | None, rules_: list[dict], history: list[dict]
 
 
 def _first_json_array(text: str | None):
-    text = text or ""
-    start = text.find("[")
-    if start < 0:
-        return []
-    try:
-        value, _ = json.JSONDecoder().raw_decode(text[start:])
-    except ValueError:
-        return []
-    return value if isinstance(value, list) else []
+    text, decoder, start = text or "", json.JSONDecoder(), 0
+    while (start := text.find("[", start)) >= 0:
+        try:
+            value, _ = decoder.raw_decode(text[start:])
+            if isinstance(value, list):
+                return value
+        except ValueError:
+            pass
+        start += 1
+    return []
 
 
 def suggest_rules(source: Source, existing: list[dict], cfg: LlmConfig, complete=complete) -> list[dict]:

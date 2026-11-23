@@ -57,7 +57,6 @@ docker compose exec ollama ollama pull llama3.2:3b   # one-time, a few GB
 
 Your data lives in `./data` next to this file. Drop more CSVs for a folder source into
 `./data/inbox/<folder name>/` and they're picked up within a minute.
-Needs Docker Compose 2.24 or newer.
 
 **Demo, about 2 minutes:**
 1. Go to **Add a source** and pick **A folder I drop CSV files into**.
@@ -91,10 +90,10 @@ mkdir -p data/inbox .dagster && cp dagster.yaml .dagster/
 - **Local, single-user tool with no login.** URL sources fetch whatever address you enter,
   including addresses on your own network. That's by design for local use. Before deploying it
   publicly, add authentication and block private/loopback addresses for URL sources.
-- No CSRF protection either: a malicious webpage open in the same browser could submit forms
-  to `localhost:8000`. Ports are bound to `127.0.0.1` so other machines can't reach it.
-- The first chat after starting Ollama can time out while the model loads on a CPU-only
-  machine; ask again after a minute.
+- Form posts from other sites are refused (Origin/Referer must match), and ports are bound to
+  `127.0.0.1` so other machines can't reach it.
+- The assistant waits up to 2 minutes, because the first answer after starting Ollama can be
+  slow while the model loads on a CPU-only machine.
 - Downloads are capped at 50 MB and 30 seconds. API sources are limited to `api.open-meteo.com`.
 - Runs are serialized (one at a time) because DuckDB allows only one writer. If you need more
   throughput, use one DuckDB file per source.

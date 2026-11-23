@@ -54,3 +54,9 @@ def test_rollback_on_error(monkeypatch):
     with pytest.raises(duckdb.Error):
         load.load(con, src, "b2", NOW)
     assert _rows(con) == [(1, "a")]
+
+
+def test_append_dedupes_within_one_file():
+    con, src = duckdb.connect(), _src("append")
+    assert _load(con, src, b"id,v\n1,a\n1,a\n2,b\n", "b1") == 2
+    assert _rows(con) == [(1, "a"), (2, "b")]
