@@ -61,7 +61,7 @@ def _failing(con, table, where, params, batch_id, rule) -> CheckResult:
 
 def evaluate(con, table: str, rule: dict, batch_id: str | None, now: datetime) -> CheckResult:
     t, rid, sev = rule["type"], rule.get("id", rule["type"]), rule["severity"]
-    col = qi(rule["column"]) if "column" in rule else None
+    col = qi(rule.get("column", "_loaded_at" if t == "freshness" else "")) if t != "row_count" else None
     if t == "not_null":
         return _failing(con, table, f"{col} IS NULL", [], batch_id, rule)
     if t == "range":
