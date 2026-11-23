@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Confirm columns · dqwatch{% endblock %}
+{% block content %}
+<h1>{{ form.name }}</h1>
+<p class="muted">Step 2 of 2: here's what dqwatch found. Fix any column types, then choose how updates are stored.</p>
+<form method="post" action="/sources">
+  {% for k in ['name', 'kind', 'location'] %}<input type="hidden" name="{{ k }}" value="{{ form[k] }}">{% endfor %}
+  <input type="hidden" name="sample" value="{{ sample_json }}">
+  <div class="card scroll"><table>
+    <tr><th>Column</th><th>Type</th><th>Example</th></tr>
+    {% for c in columns %}
+    <tr><td>{{ c.name }}<input type="hidden" name="col_name" value="{{ c.name }}"></td>
+      <td><select name="col_type">{% for t in types %}<option {% if t == c.type %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></td>
+      <td class="muted">{{ sample[0][c.name] if sample else '' }}</td></tr>
+    {% endfor %}
+  </table></div>
+  <div class="card">
+    <label for="write_mode">When new data arrives</label>
+    <select id="write_mode" name="write_mode">{% for k, v in modes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+    <p class="muted"><b>Update by key</b>: rows with the same ID are updated, new ones added. <b>Append</b>: only new rows are added.
+      <b>Replace</b>: the newest file becomes the whole table.</p>
+    <label for="key_column">Key column (which column identifies a row?)</label>
+    <select id="key_column" name="key_column"><option value="">—</option>
+      {% for c in columns %}<option>{{ c.name }}</option>{% endfor %}</select>
+    {% if form.kind != 'folder' %}
+    <label for="schedule_minutes">How often to check</label>
+    <select id="schedule_minutes" name="schedule_minutes">{% for k, v in schedules.items() %}<option value="{{ k }}" {% if k == 60 %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    {% else %}<p class="muted">The folder is checked every minute for new or changed files.</p>{% endif %}
+    <p><button>Create source</button></p>
+  </div>
+</form>
+<div class="card scroll"><b>Preview</b><table>
+  <tr>{% for c in columns %}<th>{{ c.name }}</th>{% endfor %}</tr>
+  {% for row in sample[:5] %}<tr>{% for c in columns %}<td>{{ row[c.name] }}</td>{% endfor %}</tr>{% endfor %}
+</table></div>
+{% endblock %}

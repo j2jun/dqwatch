@@ -1,0 +1,20 @@
+{% if type != 'row_count' %}
+<label>Column</label>
+<select name="column">
+  {% if type == 'freshness' %}<option value="_loaded_at">(time the data arrived)</option>{% endif %}
+  {% for c in source.columns if type != 'freshness' or c.type in ('date', 'timestamp') %}<option>{{ c.name }}</option>{% endfor %}
+</select>
+{% endif %}
+{% if type == 'range' %}
+<label>Minimum / maximum (leave one empty for no limit)</label>
+<input name="min" size="10" placeholder="min"> <input name="max" size="10" placeholder="max">
+{% elif type == 'allowed' %}
+<label>Allowed values (comma-separated)</label><input name="values" size="40" placeholder="paid, open, refunded">
+{% elif type == 'pattern' %}
+<label>Should look like</label>
+<select name="preset">{% for p in patterns %}<option>{{ p }}</option>{% endfor %}</select>
+{% elif type == 'row_count' %}
+<label>At least this many rows per load</label><input name="min" size="10" value="1">
+{% elif type == 'freshness' %}
+<label>Newest data must be at most this many hours old</label><input name="max_age_hours" size="10" value="24">
+{% endif %}

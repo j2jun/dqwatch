@@ -1,0 +1,18 @@
+services:
+  web:
+    build: .
+    command: uvicorn dqwatch.web.app:app --host 0.0.0.0 --port 8000
+    ports: ["127.0.0.1:8000:8000"]  # local only: there is no login
+    env_file: [{path: .env, required: false}]
+    volumes: ["./data:/data"]  # drop CSVs into ./data/inbox/<folder>/
+  dagster:
+    build: .
+    command: sh -c "mkdir -p $$DAGSTER_HOME /data/inbox && cp dagster.yaml $$DAGSTER_HOME/ && dagster dev -m dqwatch.orchestration -h 0.0.0.0 -p 3000"
+    ports: ["127.0.0.1:3000:3000"]  # Dagster UI can launch runs; keep it local
+    env_file: [{path: .env, required: false}]
+    volumes: ["./data:/data"]  # drop CSVs into ./data/inbox/<folder>/
+  ollama:
+    image: ollama/ollama
+    volumes: [ollama:/root/.ollama]
+volumes:
+  ollama:

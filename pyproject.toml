@@ -1,0 +1,20 @@
+[project]
+name = "dqwatch"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi", "uvicorn", "jinja2", "python-multipart",
+  "duckdb", "dagster", "dagster-webserver",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[tool.setuptools]
+packages = ["dqwatch", "dqwatch.web"]
+
+[tool.setuptools.package-data]
+"dqwatch.web" = ["templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

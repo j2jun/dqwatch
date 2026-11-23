@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Add a source · dqwatch{% endblock %}
+{% block content %}
+<h1>Add a source</h1>
+<p class="muted">Step 1 of 2: tell dqwatch where your data lives. After setup it's picked up automatically.</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form class="card" method="post" action="/sources/preview" enctype="multipart/form-data">
+  <label for="name">Name</label>
+  <input id="name" name="name" required value="{{ form.get('name', '') }}" placeholder="e.g. Orders">
+  <label>Where does the data come from?</label>
+  {% set kind = form.get('kind', 'folder') %}
+  <label class="muted"><input type="radio" name="kind" value="folder" {% if kind == 'folder' %}checked{% endif %}> A folder I drop CSV files into</label>
+  <label class="muted"><input type="radio" name="kind" value="url" {% if kind == 'url' %}checked{% endif %}> A link to a CSV (e.g. a published Google Sheet)</label>
+  <label class="muted"><input type="radio" name="kind" value="api" {% if kind == 'api' %}checked{% endif %}> Weather data (Open-Meteo demo API)</label>
+  <label for="location">Folder name or CSV link</label>
+  <input id="location" name="location" value="{{ form.get('location', '') }}" size="50" placeholder="orders  or  https://…/export?format=csv">
+  <p class="muted">For a folder, files go in <code>inbox/&lt;folder name&gt;/</code>. You can upload the first one here:</p>
+  <input type="file" name="upload" accept=".csv">
+  <label>Weather location (for the weather source)</label>
+  <input name="lat" value="{{ form.get('lat', '') }}" placeholder="Latitude, e.g. 40.7" size="18">
+  <input name="lon" value="{{ form.get('lon', '') }}" placeholder="Longitude, e.g. -74.0" size="18">
+  <p><button>Next: check the columns</button></p>
+</form>
+{% endblock %}

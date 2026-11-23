@@ -1,0 +1,6 @@
+# ponytail: one run at a time because DuckDB allows a single writer per file;
+# move to one DuckDB file per source if throughput ever matters.
+run_queue:
+  max_concurrent_runs: 1
+telemetry:
+  enabled: false

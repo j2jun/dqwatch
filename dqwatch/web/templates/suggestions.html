@@ -1,0 +1,11 @@
+{% if down %}<p class="error">The assistant isn't reachable right now. You can still add checks by hand above.</p>
+{% elif not cards %}<p class="muted">No new suggestions for this dataset.</p>{% endif %}
+{% for c in cards %}
+<div class="card"><b>{{ c.rule.type }}{% if c.rule.column %} · {{ c.rule.column }}{% endif %}</b>
+  <span class="muted">{% for k, v in c.rule.items() if k not in ('type', 'column', 'severity') %}{{ k }}={{ v }} {% endfor %}</span>
+  <p>{{ c.why }}</p>
+  <form method="post" action="/sources/{{ source.id }}/rules" style="display:inline">
+    <input type="hidden" name="rule_json" value="{{ c.json }}"><button>Add</button></form>
+  <button class="ghost" type="button" onclick="this.closest('.card').remove()">Dismiss</button>
+</div>
+{% endfor %}
