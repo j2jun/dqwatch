@@ -12,6 +12,7 @@ services:
       DQ_SMTP_USER: ${DQ_SMTP_USER:-}
       DQ_SMTP_PASSWORD: ${DQ_SMTP_PASSWORD:-}
       DQ_ALERT_TO: ${DQ_ALERT_TO:-}
+      DQ_ALLOWED_HOSTS: ${DQ_ALLOWED_HOSTS:-localhost,127.0.0.1}
     volumes: ["./data:/data"]  # drop CSVs into ./data/inbox/<folder>/
   dagster:
     build: .

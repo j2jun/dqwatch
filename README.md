@@ -90,8 +90,9 @@ mkdir -p data/inbox .dagster && cp dagster.yaml .dagster/
 - **Local, single-user tool with no login.** URL sources fetch whatever address you enter,
   including addresses on your own network. That's by design for local use. Before deploying it
   publicly, add authentication and block private/loopback addresses for URL sources.
-- Form posts from other sites are refused (Origin/Referer must match), and ports are bound to
-  `127.0.0.1` so other machines can't reach it.
+- Form posts from other sites are refused (Origin/Referer must match), the app only answers to
+  the host names in `DQ_ALLOWED_HOSTS` (default `localhost,127.0.0.1`, which blocks DNS rebinding),
+  and ports are bound to `127.0.0.1` so other machines can't reach it.
 - The assistant waits up to 2 minutes, because the first answer after starting Ollama can be
   slow while the model loads on a CPU-only machine.
 - Downloads are capped at 50 MB and 30 seconds. API sources are limited to `api.open-meteo.com`.

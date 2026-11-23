@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from dqwatch import fetch, llm, meta, rules, schema
 from dqwatch.models import Column, Source
@@ -71,6 +72,10 @@ def location_error(kind: str, location: str) -> str:
 
 def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete=llm.complete) -> FastAPI:
     app = FastAPI(title="dqwatch")
+    # Only answer requests addressed to this machine: blocks DNS rebinding, where an attacker's
+    # domain resolves to 127.0.0.1 and would otherwise pass the same-origin check below.
+    hosts = [h.strip() for h in os.environ.get("DQ_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
     app.state.llm_cfg, app.state.complete = llm_cfg, complete
 
     local = threading.local()

@@ -15,7 +15,7 @@ def ctx(tmp_path):
     mp, inbox = str(tmp_path / "m.sqlite"), tmp_path / "inbox"
     inbox.mkdir()
     app = create_app(mp, str(inbox), LlmConfig("http://ollama:11434/v1", "", "m"))
-    return {"client": TestClient(app), "meta": mp, "inbox": inbox}
+    return {"client": TestClient(app, base_url="http://localhost"), "meta": mp, "inbox": inbox}
 
 
 def _create(ctx):
@@ -135,10 +135,19 @@ def test_cross_site_post_rejected(ctx):
     assert r.status_code == 403
     assert meta.list_rules(meta.connect(ctx["meta"]), sid) == []
     r = ctx["client"].post(f"/sources/{sid}/rules", data={"type": "unique", "column": "id"},
-                           headers={"Origin": "http://testserver"})
+                           headers={"Origin": "http://localhost"})
     assert r.status_code == 200 and len(meta.list_rules(meta.connect(ctx["meta"]), sid)) == 1
 
 
 def test_db_connection_reused_per_thread(ctx):
     db = ctx["client"].app.state.db
     assert db() is db()
+
+
+def test_dns_rebinding_host_rejected(ctx):
+    sid = _source(ctx)
+    r = ctx["client"].post(f"/sources/{sid}/rules", data={"type": "unique", "column": "id"},
+                           headers={"Host": "evil.example", "Origin": "http://evil.example"})
+    assert r.status_code == 400
+    assert meta.list_rules(meta.connect(ctx["meta"]), sid) == []
+    assert ctx["client"].get("/", headers={"Host": "127.0.0.1:8000"}).status_code == 200
