@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ source.name }} · dqwatch{% endblock %}
+{% block content %}
+<h1>{{ source.name }}</h1>
+<p class="muted">{{ source.kind }} · {{ source.location }} · {{ modes[source.write_mode] }}{% if source.key_column %} (key: {{ source.key_column }}){% endif %}
+  · checked every {{ source.schedule_minutes }} min</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<div class="card"><b>Checks</b>
+  <table>
+    <tr><th>Check</th><th>Severity</th><th>Recent runs (oldest → newest)</th><th></th></tr>
+    {% for sys in ['fetch', 'schema', 'duplicate_keys'] if sys in strips %}
+    <tr><td class="muted">{{ sys }} (built in)</td><td class="muted">{{ strips[sys][-1].severity }}</td>
+      <td><div class="strip">{% for h in strips[sys] %}<span class="{{ 'error-s' if h.status == 'error' else h.status }}" title="{{ h.at }} {{ h.detail }}"></span>{% endfor %}</div></td><td></td></tr>
+    {% endfor %}
+    {% for r in rules %}
+    <tr><td>{{ r.type }}{% if r.column %} · {{ r.column }}{% endif %}
+        <span class="muted">{% for k, v in r.items() if k not in ('id', 'type', 'column', 'severity') %}{{ k }}={{ v }} {% endfor %}</span></td>
+      <td>{{ r.severity }}</td>
+      <td><div class="strip">{% for h in strips.get(r.id, []) %}<span class="{{ 'error-s' if h.status == 'error' else h.status }}" title="{{ h.at }} {{ h.failing_count }} failing {{ h.detail }}"></span>{% endfor %}</div></td>
+      <td><form method="post" action="/sources/{{ source.id }}/rules/{{ r.id }}/delete"><button class="ghost">Remove</button></form></td></tr>
+    {% else %}<tr><td colspan="4" class="muted">No checks yet. Add one below or ask the assistant for suggestions.</td></tr>{% endfor %}
+  </table>
+</div>
+
+<form class="card" method="post" action="/sources/{{ source.id }}/rules">
+  <b>Add a check</b>
+  <label for="type">What should be true?</label>
+  <select id="type" name="type" hx-get="/sources/{{ source.id }}/rule-form" hx-target="#rule-fields" hx-trigger="change">
+    {% for t in rule_types %}<option {% if t == 'not_null' %}selected{% endif %}>{{ t }}</option>{% endfor %}
+  </select>
+  <div id="rule-fields">{% with type = 'not_null' %}{% include "rule_form.html" %}{% endwith %}</div>
+  <label for="severity">If it fails</label>
+  <select id="severity" name="severity"><option value="error">Email me (error)</option><option value="warn">Show on dashboard only (warn)</option></select>
+  <p><button>Add check</button></p>
+</form>
+
+{% block suggestions %}{% endblock %}
+
+<div class="card scroll"><b>Latest problems</b>
+  {% set fails = [] %}
+  {% for rid, hs in strips.items() if hs[-1].status != 'pass' %}{% set _ = fails.append(hs[-1]) %}{% endfor %}
+  <table>{% for h in fails %}
+    <tr><td>{{ h.rule_id }}</td><td><span class="pill {{ 'error-s' if h.status == 'error' else h.status }}">{{ h.status }}</span></td>
+      <td>{{ h.failing_count }} row(s)</td><td class="muted">{{ h.detail }}</td></tr>
+    {% if h.sample %}<tr><td colspan="4"><code class="muted">{{ h.sample[:3] | tojson }}</code></td></tr>{% endif %}
+  {% else %}<tr><td class="muted">Nothing failing right now.</td></tr>{% endfor %}</table>
+</div>
+
+{% if attention %}
+<div class="card scroll"><b>Needs attention</b> <span class="muted">rows set aside because they had no key</span>
+  <table>{% for a in attention %}<tr><td class="muted">{{ a.reason }}</td><td><code>{{ a.raw | tojson }}</code></td></tr>{% endfor %}</table>
+</div>
+{% endif %}
+{% endblock %}

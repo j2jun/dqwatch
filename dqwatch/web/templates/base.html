@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}dqwatch{% endblock %}</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<style>
+:root { --bg:#f7f7f5; --card:#fff; --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e3e0; --accent:#2f5bd3;
+        --pass:#2e8540; --fail:#c62828; --warn:#b26a00; --err:#6a1b9a; }
+@media (prefers-color-scheme: dark) { :root { --bg:#151517; --card:#1f1f22; --ink:#ececee; --muted:#9a9aa0;
+        --line:#333338; --accent:#7c9cff; --pass:#5cbf6e; --fail:#ff6b6b; --warn:#e0a040; --err:#c08ae6; } }
+* { box-sizing:border-box } body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--ink) }
+header { display:flex; gap:16px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card) }
+header a { color:var(--ink); text-decoration:none } header .brand { font-weight:700 }
+main { max-width:960px; margin:0 auto; padding:16px } a { color:var(--accent) }
+.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin:12px 0 }
+table { width:100%; border-collapse:collapse } td,th { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); font-size:14px }
+.scroll { overflow-x:auto } label { display:block; margin:8px 0 2px; font-weight:600; font-size:14px }
+input,select,textarea { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); max-width:100% }
+button { font:inherit; padding:7px 14px; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer }
+button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line) }
+.muted { color:var(--muted); font-size:13px } .error { color:var(--fail); font-weight:600 }
+.pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; color:#fff }
+.pass{background:var(--pass)} .fail{background:var(--fail)} .error-s{background:var(--err)} .warn{background:var(--warn)}
+.strip { display:flex; gap:2px } .strip span { width:10px; height:18px; border-radius:2px }
+#chat { position:fixed; right:16px; bottom:16px; width:min(360px, calc(100vw - 32px)); z-index:10 }
+#chat details { background:var(--card); border:1px solid var(--line); border-radius:10px; box-shadow:0 4px 18px rgba(0,0,0,.12) }
+#chat summary { padding:10px 14px; cursor:pointer; font-weight:600 } #chat .body { padding:0 14px 14px }
+#log { max-height:320px; overflow-y:auto; font-size:14px } .msg { margin:8px 0 } .msg.user { text-align:right }
+.msg .b { display:inline-block; padding:6px 10px; border-radius:10px; background:var(--bg); white-space:pre-wrap; text-align:left }
+</style>
+</head>
+<body>
+<header><a class="brand" href="/">dqwatch</a><a href="/">Dashboard</a><a href="/sources/new">Add a source</a></header>
+<main>{% block content %}{% endblock %}</main>
+{% block chat %}{% endblock %}
+</body>
+</html>
