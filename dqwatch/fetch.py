@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import time
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -42,8 +43,18 @@ def _get(url: str, timeout: float) -> bytes:
     if not url.startswith(("http://", "https://")):
         raise FetchError("Only http(s) links are supported.")
     try:
+        deadline = time.monotonic() + timeout
+        chunks, size = [], 0
         with urllib.request.urlopen(url, timeout=timeout) as resp:
-            body = resp.read(MAX_BYTES + 1)
+            while size <= MAX_BYTES:
+                if time.monotonic() > deadline:
+                    raise TimeoutError(f"download took longer than {timeout:g}s")
+                chunk = resp.read1(64 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                size += len(chunk)
+        body = b"".join(chunks)
     except Exception as e:  # HTTPError, URLError, timeouts, resets
         raise FetchError(f"Couldn't reach {url}: {e}") from e
     if len(body) > MAX_BYTES:

@@ -100,3 +100,28 @@ def test_url_too_large_rejected(server, monkeypatch):
 def test_api_only_open_meteo(server):
     with pytest.raises(fetch.FetchError, match="open-meteo"):
         fetch.fetch(_src("api", server + "/ok"), "")
+
+
+def test_url_slow_drip_hits_total_deadline():
+    import socket
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+
+    def drip():
+        conn, _ = srv.accept()
+        conn.recv(1024)
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n")
+        try:
+            for _ in range(100):
+                conn.sendall(b"x")
+                time.sleep(0.1)
+        except OSError:
+            pass
+        conn.close()
+
+    threading.Thread(target=drip, daemon=True).start()
+    start = time.monotonic()
+    with pytest.raises(fetch.FetchError):
+        fetch.fetch(_src("url", f"http://127.0.0.1:{srv.getsockname()[1]}/"), "", timeout=0.5)
+    assert time.monotonic() - start < 3

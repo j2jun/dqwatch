@@ -77,8 +77,15 @@ def add_rule(con, source_id: int, rule: dict) -> str:
 
 
 def list_rules(con, source_id: int) -> list[dict]:
-    return [json.loads(r["body"]) for r in
-            con.execute("SELECT body FROM rules WHERE source_id = ? ORDER BY rowid", (source_id,))]
+    """A corrupt stored rule comes back as {"id": ..., "type": None} so callers report it, not crash."""
+    out = []
+    for r in con.execute("SELECT id, body FROM rules WHERE source_id = ? ORDER BY rowid", (source_id,)):
+        try:
+            body = json.loads(r["body"])
+        except ValueError:
+            body = None
+        out.append(body if isinstance(body, dict) else {"id": r["id"], "type": None})
+    return out
 
 
 def delete_rule(con, source_id: int, rule_id: str):

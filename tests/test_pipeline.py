@@ -129,3 +129,59 @@ def test_load_failure_reraised_and_recorded(env, monkeypatch):
     with pytest.raises(RuntimeError):
         _run(env)
     assert meta.latest_runs(env["meta"])[env["sid"]]["status"] == "load_failed"
+
+
+# --- mid-build review fixes ---
+
+def test_sqlite_error_after_commit_does_not_raise(env, monkeypatch):
+    import sqlite3
+    def locked(*a, **k):
+        raise sqlite3.OperationalError("database is locked")
+    monkeypatch.setattr(meta, "record_fingerprint", locked)
+    _drop(env, "a.csv", b"id,email,amount\n1,a@x.com,5\n")
+    assert _run(env) == "loaded"
+    assert _rows(env) == 1
+    assert meta.latest_runs(env["meta"])[env["sid"]]["status"] == "loaded"
+    assert _results(env, "internal")[0]["status"] == "error"
+
+
+def test_malformed_stored_rule_is_a_result(env):
+    env["meta"].execute("INSERT INTO rules (id, source_id, body) VALUES ('bad1', ?, '[1]')", (env["sid"],))
+    env["meta"].execute("INSERT INTO rules (id, source_id, body) VALUES ('bad2', ?, '{oops')", (env["sid"],))
+    env["meta"].commit()
+    _drop(env, "a.csv", b"id,email,amount\n1,a@x.com,5\n")
+    assert _run(env) == "loaded"
+    assert _rows(env) == 1
+    assert _results(env, "bad1")[0]["status"] == "error"
+    assert _results(env, "bad2")[0]["status"] == "error"
+
+
+def test_later_load_failure_keeps_earlier_alerts(env, monkeypatch):
+    from dqwatch import load
+    meta.add_rule(env["meta"], env["sid"], {"type": "not_null", "column": "email", "severity": "error"})
+    real, calls = load.load, []
+
+    def flaky(*a, **k):
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("disk full")
+        return real(*a, **k)
+    monkeypatch.setattr(load, "load", flaky)
+    _drop(env, "a.csv", b"id,email,amount\n1,,5\n")
+    _drop(env, "b.csv", b"id,email,amount\n2,b@x.com,5\n")
+    os_utime = __import__("os").utime
+    os_utime(env["inbox"] / "orders" / "a.csv", (1, 1))
+    sent = []
+    with pytest.raises(RuntimeError):
+        _run(env, send=lambda m, c: sent.append(m))
+    assert _rows(env) == 1
+    assert len(sent) == 1 and "load" in sent[0].get_content()
+    assert meta.latest_runs(env["meta"])[env["sid"]]["status"] == "load_failed"
+
+
+def test_unreadable_file_alerts_once(env):
+    _drop(env, "a.csv", b"   \n")
+    sent = []
+    for i in range(3):
+        _run(env, now=NOW + timedelta(minutes=i), send=lambda m, c: sent.append(m))
+    assert len(sent) == 1
