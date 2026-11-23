@@ -24,3 +24,20 @@ def test_from_env_none_when_unset(monkeypatch):
     monkeypatch.setenv("DQ_ALERT_TO", "t@example.com")
     cfg = notify.smtp_from_env()
     assert cfg.host == "h" and cfg.port == 587 and cfg.to == "t@example.com"
+
+
+def test_starttls_verifies_certificates(monkeypatch):
+    import ssl
+    seen = {}
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def starttls(self, context=None): seen["ctx"] = context
+        def login(self, u, p): pass
+        def send_message(self, m): pass
+
+    monkeypatch.setattr(notify.smtplib, "SMTP", FakeSMTP)
+    notify.send_alert("s", [], CFG)
+    assert isinstance(seen["ctx"], ssl.SSLContext) and seen["ctx"].verify_mode == ssl.CERT_REQUIRED

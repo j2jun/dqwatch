@@ -89,3 +89,14 @@ def test_flatten_open_meteo():
 def test_open_meteo_url():
     assert fetch.open_meteo_url(1.5, -2) == ("https://api.open-meteo.com/v1/forecast?latitude=1.5&longitude=-2"
                                              "&hourly=temperature_2m,precipitation,wind_speed_10m")
+
+
+def test_url_too_large_rejected(server, monkeypatch):
+    monkeypatch.setattr(fetch, "MAX_BYTES", 3)
+    with pytest.raises(fetch.FetchError, match="larger"):
+        fetch.fetch(_src("url", server + "/ok"), "")
+
+
+def test_api_only_open_meteo(server):
+    with pytest.raises(fetch.FetchError, match="open-meteo"):
+        fetch.fetch(_src("api", server + "/ok"), "")

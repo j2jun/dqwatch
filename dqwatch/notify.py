@@ -1,6 +1,7 @@
 """Email alerts over SMTP (e.g. Gmail with an app password)."""
 import os
 import smtplib
+import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
 
@@ -26,7 +27,7 @@ def smtp_from_env() -> SmtpConfig | None:
 
 def _smtp_send(msg: EmailMessage, cfg: SmtpConfig):
     with smtplib.SMTP(cfg.host, cfg.port, timeout=30) as s:
-        s.starttls()
+        s.starttls(context=ssl.create_default_context())
         if cfg.user:
             s.login(cfg.user, cfg.password)
         s.send_message(msg)
