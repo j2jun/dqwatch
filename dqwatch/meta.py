@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS attention (
 """
 
 
+class NotFound(KeyError):
+    pass
+
+
 def connect(path: str) -> sqlite3.Connection:
     con = sqlite3.connect(path, timeout=30, check_same_thread=False)
     con.row_factory = sqlite3.Row
@@ -55,7 +59,7 @@ def create_source(con, src: Source) -> int:
 def get_source(con, id: int) -> Source:
     row = con.execute("SELECT * FROM sources WHERE id = ?", (id,)).fetchone()
     if row is None:
-        raise KeyError(id)
+        raise NotFound(id)
     return _source(row)
 
 

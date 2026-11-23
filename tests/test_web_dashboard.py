@@ -17,7 +17,7 @@ def _setup(tmp_path, complete, cfg=LOCAL):
     con = meta.connect(mp)
     sid = meta.create_source(con, Source(None, "Orders", "folder", "orders", 1, "upsert", "id",
                                          [Column("id", "integer"), Column("email", "text")]))
-    return TestClient(create_app(mp, str(tmp_path), cfg, complete=complete)), con, sid
+    return TestClient(create_app(mp, str(tmp_path), cfg, complete=complete), base_url="http://localhost"), con, sid
 
 
 def test_dashboard_lists_sources_with_status(tmp_path):
@@ -35,7 +35,7 @@ def test_dashboard_lists_sources_with_status(tmp_path):
 
 def test_dashboard_empty_state(tmp_path):
     mp = str(tmp_path / "m.sqlite")
-    r = TestClient(create_app(mp, str(tmp_path), LOCAL)).get("/")
+    r = TestClient(create_app(mp, str(tmp_path), LOCAL), base_url="http://localhost").get("/")
     assert "Add a source" in r.text
 
 

@@ -58,3 +58,8 @@ def test_system_prompt_has_context():
 
 def test_suggest_null_content():
     assert llm.suggest_rules(SRC, [], CFG, complete=_fake(None)[0]) == []
+
+
+def test_suggest_skips_bracket_before_array():
+    reply = 'Sure [see below]: [{"type": "unique", "column": "id"}]'
+    assert [r["type"] for r in llm.suggest_rules(SRC, [], CFG, complete=_fake(reply)[0])] == ["unique"]

@@ -230,3 +230,21 @@ def test_internal_and_email_errors_clear(env, monkeypatch):
     _run(env, now=NOW + timedelta(minutes=2))
     assert _results(env, "internal")[0]["status"] == "pass"
     assert _results(env, "email")[0]["status"] == "pass"
+
+
+# --- deferred minors ---
+
+def test_all_files_unreadable_is_fetch_error(env):
+    _drop(env, "a.csv", b"   \n")
+    assert _run(env) == "fetch_error"
+
+
+def test_results_name_their_file(env):
+    import os
+    meta.add_rule(env["meta"], env["sid"], {"type": "not_null", "column": "email"})
+    _drop(env, "a.csv", b"id,email,amount\n1,,5\n")
+    _drop(env, "b.csv", b"id,email,amount\n2,,5\n")
+    os.utime(env["inbox"] / "orders" / "a.csv", (1, 1))
+    _run(env)
+    details = [r["detail"] for r in meta.results_history(env["meta"], env["sid"], 100) if r["rule_id"] == "schema"]
+    assert any(d.startswith("a.csv") for d in details) and any(d.startswith("b.csv") for d in details)

@@ -3,13 +3,22 @@ services:
     build: .
     command: uvicorn dqwatch.web.app:app --host 0.0.0.0 --port 8000
     ports: ["127.0.0.1:8000:8000"]  # local only: there is no login
-    env_file: [{path: .env, required: false}]
+    environment: &dq_env  # filled from .env if present (any Compose version)
+      DQ_LLM_BASE_URL: ${DQ_LLM_BASE_URL:-http://ollama:11434/v1}
+      DQ_LLM_MODEL: ${DQ_LLM_MODEL:-llama3.2:3b}
+      DQ_LLM_API_KEY: ${DQ_LLM_API_KEY:-}
+      DQ_SMTP_HOST: ${DQ_SMTP_HOST:-}
+      DQ_SMTP_PORT: ${DQ_SMTP_PORT:-587}
+      DQ_SMTP_USER: ${DQ_SMTP_USER:-}
+      DQ_SMTP_PASSWORD: ${DQ_SMTP_PASSWORD:-}
+      DQ_ALERT_TO: ${DQ_ALERT_TO:-}
+      DQ_ALLOWED_HOSTS: ${DQ_ALLOWED_HOSTS:-localhost,127.0.0.1}
     volumes: ["./data:/data"]  # drop CSVs into ./data/inbox/<folder>/
   dagster:
     build: .
     command: sh -c "mkdir -p $$DAGSTER_HOME /data/inbox && cp dagster.yaml $$DAGSTER_HOME/ && dagster dev -m dqwatch.orchestration -h 0.0.0.0 -p 3000"
     ports: ["127.0.0.1:3000:3000"]  # Dagster UI can launch runs; keep it local
-    env_file: [{path: .env, required: false}]
+    environment: *dq_env
     volumes: ["./data:/data"]  # drop CSVs into ./data/inbox/<folder>/
   ollama:
     image: ollama/ollama

@@ -49,7 +49,7 @@ def run_source(meta_con, duck_con, source_id: int, inbox_root: str, now: datetim
         except Exception as e:
             record(CheckResult("internal", "error", "warn", detail=f"{what} failed: {e}"))
 
-    status, load_error = "no_change", None
+    status, load_error, unreadable = "no_change", None, 0
     try:
         try:
             items = fetch.fetch(source, inbox_root)
@@ -69,6 +69,7 @@ def run_source(meta_con, duck_con, source_id: int, inbox_root: str, now: datetim
                 report = schema.stage(duck_con, data, source.columns, source.key_column)
             except Exception as e:
                 record(CheckResult("fetch", "error", "error", detail=f"{label}: {e}"))
+                unreadable += 1
                 best_effort("Saving the file fingerprint", meta.record_fingerprint, meta_con, source_id, item, sha)
                 continue  # an unreadable version is reported once, then skipped until it changes
             try:
@@ -86,12 +87,19 @@ def run_source(meta_con, duck_con, source_id: int, inbox_root: str, now: datetim
                 best_effort("Saving a needs-attention row", meta.add_attention, meta_con, source_id, batch_id,
                             "missing key", row)
             best_effort("Updating the sample", lambda: meta.update_sample(meta_con, source_id, schema.preview(data)))
-            record(rules.schema_result(report))
-            if source.key_column:
-                record(rules.duplicate_keys_result(report))
-            for rule in user_rules:
-                record(_safe_eval(duck_con, table, rule, source.columns, batch_id, now))
+            def per_file(res: CheckResult) -> CheckResult:
+                if item:  # several files can load in one run; say which one this is about
+                    res.detail = f"{item}: {res.detail}" if res.detail else item
+                return res
 
+            record(per_file(rules.schema_result(report)))
+            if source.key_column:
+                record(per_file(rules.duplicate_keys_result(report)))
+            for rule in user_rules:
+                record(per_file(_safe_eval(duck_con, table, rule, source.columns, batch_id, now)))
+
+        if status == "no_change" and unreadable:
+            status = "fetch_error"
         if status != "loaded" and _table_exists(duck_con, table):
             for rule in user_rules:
                 if isinstance(rule, dict) and rule.get("type") == "freshness":
