@@ -181,6 +181,63 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
         meta.delete_rule(db(), sid, rule_id)
         return RedirectResponse(f"/sources/{sid}", status_code=303)
 
+    def latest_by_rule(con, sid: int) -> dict[str, dict]:
+        latest: dict[str, dict] = {}
+        for h in meta.results_history(con, sid, 500):
+            latest.setdefault(h["rule_id"], h)
+        return latest
+
+    @app.get("/", response_class=HTMLResponse)
+    def dashboard(request: Request):
+        con = db()
+        runs, rows = meta.latest_runs(con), []
+        for src in meta.list_sources(con):
+            failing = [h for h in latest_by_rule(con, src.id).values() if h["status"] != "pass"]
+            rows.append({"source": src, "run": runs.get(src.id),
+                         "errors": sum(h["severity"] == "error" for h in failing),
+                         "warnings": sum(h["severity"] == "warn" for h in failing)})
+        return page(request, "dashboard.html", rows=rows)
+
+    def _turns(raw: str) -> list[dict]:
+        try:
+            turns = json.loads(raw or "[]")
+        except ValueError:
+            return []
+        # only plain user/assistant turns survive; the system prompt is always ours
+        return [{"role": t["role"], "content": str(t["content"])[:4000]} for t in turns
+                if isinstance(t, dict) and t.get("role") in ("user", "assistant") and "content" in t][-10:]
+
+    @app.post("/chat", response_class=HTMLResponse)
+    def chat(request: Request, message: str = Form(...), source_id: str = Form(""), history: str = Form("[]")):
+        con, src, rules_, hist = db(), None, [], []
+        if source_id.isdigit():
+            try:
+                src = meta.get_source(con, int(source_id))
+                rules_, hist = meta.list_rules(con, src.id), meta.results_history(con, src.id, 10)
+            except KeyError:
+                src = None
+        turns = _turns(history) + [{"role": "user", "content": message[:4000]}]
+        try:
+            reply = app.state.complete([{"role": "system", "content": llm.system_prompt(src, rules_, hist)}]
+                                       + turns, llm_cfg)
+            turns.append({"role": "assistant", "content": reply})
+            down = False
+        except llm.LlmUnavailable:
+            down = True
+        return page(request, "chat_log.html", turns=turns, down=down, history_json=json.dumps(turns))
+
+    @app.post("/sources/{sid}/suggest", response_class=HTMLResponse)
+    def suggest(request: Request, sid: int):
+        con = db()
+        src = meta.get_source(con, sid)
+        try:
+            found = llm.suggest_rules(src, meta.list_rules(con, sid), llm_cfg, complete=app.state.complete)
+            down = False
+        except llm.LlmUnavailable:
+            found, down = [], True
+        cards = [{"rule": r, "why": r.pop("why", ""), "json": json.dumps(r)} for r in found]
+        return page(request, "suggestions.html", source=src, cards=cards, down=down)
+
     return app
 
 

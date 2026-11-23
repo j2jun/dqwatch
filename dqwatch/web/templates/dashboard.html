@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<p class="muted">Data always lands; checks only report. Failing <b>error</b> checks also email you.</p>
+<div class="card scroll"><table>
+  <tr><th>Source</th><th>Last run</th><th>When</th><th>Failing checks</th></tr>
+  {% for r in rows %}
+  <tr><td><a href="/sources/{{ r.source.id }}">{{ r.source.name }}</a> <span class="muted">{{ r.source.kind }}</span></td>
+    <td>{% if r.run %}{{ r.run.status }}{% else %}<span class="muted">waiting for first run</span>{% endif %}</td>
+    <td class="muted">{{ r.run.started_at[:16].replace('T', ' ') if r.run else '' }}</td>
+    <td>{% if r.errors %}<span class="pill fail">{{ r.errors }} error{{ 's' if r.errors > 1 }}</span>{% endif %}
+        {% if r.warnings %}<span class="pill warn">{{ r.warnings }} warning{{ 's' if r.warnings > 1 }}</span>{% endif %}
+        {% if not r.errors and not r.warnings %}<span class="pill pass">all good</span>{% endif %}</td></tr>
+  {% else %}
+  <tr><td colspan="4">No sources yet. <a href="/sources/new">Add a source</a> to get started, or ask the assistant how.</td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

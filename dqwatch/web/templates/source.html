@@ -35,7 +35,12 @@
   <p><button>Add check</button></p>
 </form>
 
-{% block suggestions %}{% endblock %}
+<div class="card"><b>Not sure what to check?</b>
+  <p class="muted">The assistant looks at a sample of your data and suggests checks. Nothing is added until you click Add.</p>
+  <button class="ghost" hx-post="/sources/{{ source.id }}/suggest" hx-target="#suggestions" hx-indicator="#thinking">Suggest checks</button>
+  <span id="thinking" class="htmx-indicator muted">thinking…</span>
+  <div id="suggestions"></div>
+</div>
 
 <div class="card scroll"><b>Latest problems</b>
   {% set fails = [] %}

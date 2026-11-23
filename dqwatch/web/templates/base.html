@@ -33,6 +33,6 @@ button.ghost { background:transparent; color:var(--accent); border:1px solid var
 <body>
 <header><a class="brand" href="/">dqwatch</a><a href="/">Dashboard</a><a href="/sources/new">Add a source</a></header>
 <main>{% block content %}{% endblock %}</main>
-{% block chat %}{% endblock %}
+{% include "chat.html" %}
 </body>
 </html>

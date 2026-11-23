@@ -1,0 +1,3 @@
+<div id="log">{% for t in turns %}<div class="msg {{ t.role }}"><span class="b">{{ t.content }}</span></div>{% endfor %}
+{% if down %}<p class="error">The assistant isn't reachable right now. Everything else keeps working.</p>{% endif %}</div>
+<input type="hidden" name="history" value="{{ history_json }}">

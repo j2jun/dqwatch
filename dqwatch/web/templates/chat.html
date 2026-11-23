@@ -1,0 +1,12 @@
+<div id="chat"><details>
+  <summary>Ask the assistant</summary>
+  <div class="body">
+    {% if hosted %}<p class="muted">Heads up: your sample rows are sent to the AI provider you configured.</p>{% endif %}
+    <form hx-post="/chat" hx-target="#chat-state" hx-swap="innerHTML" hx-on::after-request="this.message.value=''">
+      <div id="chat-state"><div id="log"><p class="muted">Ask anything: “what's a key column?”, “why did this fail?”</p></div>
+        <input type="hidden" name="history" value="[]"></div>
+      <input type="hidden" name="source_id" value="{{ source.id if source is defined and source else '' }}">
+      <input name="message" required placeholder="Type a question" style="width:100%" autocomplete="off">
+    </form>
+  </div>
+</details></div>
