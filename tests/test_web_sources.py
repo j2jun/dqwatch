@@ -98,3 +98,12 @@ def test_rule_form_fields(ctx):
     sid = _source(ctx)
     r = ctx["client"].get(f"/sources/{sid}/rule-form", params={"type": "pattern"})
     assert 'name="preset"' in r.text and "email" in r.text
+
+
+@pytest.mark.parametrize("kind,location", [("folder", "../etc"), ("url", "file:///etc/passwd"),
+                                           ("api", "http://127.0.0.1/x"), ("bogus", "x")])
+def test_create_revalidates_location(ctx, kind, location):
+    ctx["client"].post("/sources", data={
+        "name": "O", "kind": kind, "location": location, "write_mode": "append", "key_column": "",
+        "schedule_minutes": "60", "col_name": ["id"], "col_type": ["integer"], "sample": "[]"})
+    assert meta.list_sources(meta.connect(ctx["meta"])) == []

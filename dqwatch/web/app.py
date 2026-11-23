@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import urllib.parse
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, UploadFile
@@ -50,6 +51,18 @@ def _rule_from_form(form) -> dict:
     elif t == "freshness":
         rule["max_age_hours"] = _num(form.get("max_age_hours"))
     return rule
+
+
+def location_error(kind: str, location: str) -> str:
+    """Server-side check of a source's kind/location (the runtime fetcher enforces the same)."""
+    if kind == "folder":
+        return "" if FOLDER_RE.match(location) else "Folder names can use letters, numbers, - and _ only."
+    if kind == "url":
+        return "" if location.startswith(("http://", "https://")) else "Links must start with http:// or https://."
+    if kind == "api":
+        ok = urllib.parse.urlparse(location).hostname == fetch.API_HOST
+        return "" if ok else "The weather source must use the Open-Meteo API."
+    return "Pick a source type."
 
 
 def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete=llm.complete) -> FastAPI:
@@ -126,13 +139,11 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
         names, types = f.getlist("col_name"), f.getlist("col_type")
         mode, key = f.get("write_mode", "upsert"), (f.get("key_column") or None)
         cols = [Column(n, t) for n, t in zip(names, types) if t in schema.TYPES]
-        error = ""
-        if mode not in MODES:
-            error = "Pick how updates should be stored."
-        elif mode == "upsert" and key not in names:
-            error = "'Update by key' needs a key column: pick the column that identifies a row."
-        elif not cols:
-            error = "No columns to store."
+        error = (location_error(f.get("kind", ""), f.get("location", ""))
+                 or ("Pick how updates should be stored." if mode not in MODES else "")
+                 or ("'Update by key' needs a key column: pick the column that identifies a row."
+                     if mode == "upsert" and key not in names else "")
+                 or ("No columns to store." if not cols else ""))
         if error:
             return page(request, "sources_new.html", error=error, form=dict(f))
         kind = f.get("kind")
