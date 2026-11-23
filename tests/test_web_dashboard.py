@@ -22,9 +22,11 @@ def _setup(tmp_path, complete, cfg=LOCAL):
 
 def test_dashboard_lists_sources_with_status(tmp_path):
     client, con, sid = _setup(tmp_path, None)
+    r1 = meta.add_rule(con, sid, {"type": "unique", "column": "id", "severity": "error"})
+    r2 = meta.add_rule(con, sid, {"type": "not_null", "column": "email", "severity": "warn"})
     run = meta.start_run(con, sid, "2026-01-01T00:00:00+00:00")
-    meta.record_result(con, run, sid, CheckResult("r1", "fail", "error"), "2026-01-01T00:00:00+00:00")
-    meta.record_result(con, run, sid, CheckResult("r2", "fail", "warn"), "2026-01-01T00:00:00+00:00")
+    meta.record_result(con, run, sid, CheckResult(r1, "fail", "error"), "2026-01-01T00:00:00+00:00")
+    meta.record_result(con, run, sid, CheckResult(r2, "fail", "warn"), "2026-01-01T00:00:00+00:00")
     meta.finish_run(con, run, "loaded")
     r = client.get("/")
     assert "Orders" in r.text and "loaded" in r.text and f"/sources/{sid}" in r.text
@@ -82,3 +84,15 @@ def test_suggest_llm_down(tmp_path):
 def test_hosted_notice(tmp_path, url, shown):
     client, _, _ = _setup(tmp_path, None, LlmConfig(url, "k", "m"))
     assert (NOTICE in client.get("/").text) is shown
+
+
+def test_deleted_rule_no_longer_counts(tmp_path):
+    client, con, sid = _setup(tmp_path, None)
+    rid = meta.add_rule(con, sid, {"type": "unique", "column": "id"})
+    run = meta.start_run(con, sid, "2026-01-01T00:00:00+00:00")
+    meta.record_result(con, run, sid, CheckResult(rid, "fail", "error"), "2026-01-01T00:00:00+00:00")
+    meta.finish_run(con, run, "loaded")
+    assert "1 error" in client.get("/").text
+    meta.delete_rule(con, sid, rid)
+    assert "all good" in client.get("/").text
+    assert rid not in client.get(f"/sources/{sid}").text

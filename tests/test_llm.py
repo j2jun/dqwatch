@@ -54,3 +54,7 @@ def test_system_prompt_has_context():
                           [{"rule_id": "schema", "status": "fail", "detail": "missing columns: amount"}])
     assert "orders" in p and "email" in p and "a@x.com" in p and "missing columns: amount" in p
     assert "not a data engineer" in llm.system_prompt(None, [], [])
+
+
+def test_suggest_null_content():
+    assert llm.suggest_rules(SRC, [], CFG, complete=_fake(None)[0]) == []

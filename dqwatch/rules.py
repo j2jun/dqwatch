@@ -11,6 +11,10 @@ _TIME_TYPES = {"date", "timestamp"}
 _INTERNAL = "_raw, _row_hash, _batch_id, _loaded_at"
 
 
+def _is_num(x) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
 def validate_rule(rule: dict, columns: list[Column]) -> dict:
     r = {**rule}
     r.setdefault("severity", "error")
@@ -25,16 +29,20 @@ def validate_rule(rule: dict, columns: list[Column]) -> dict:
         if r["column"] != "_loaded_at" and types.get(r["column"]) not in _TIME_TYPES:
             raise ValueError("Freshness needs a date or timestamp column.")
         hours = r.get("max_age_hours")
-        if not isinstance(hours, (int, float)) or hours <= 0:
+        if not _is_num(hours) or hours <= 0:
             raise ValueError("Freshness needs a maximum age in hours greater than 0.")
     elif t == "row_count":
-        if not isinstance(r.get("min"), int) or r["min"] < 0:
+        if not _is_num(r.get("min")) or r["min"] != int(r["min"]) or r["min"] < 0:
             raise ValueError("Row count needs a whole-number minimum.")
     else:
         if r.get("column") not in types:
             raise ValueError(f"Column {r.get('column')!r} isn't in this dataset.")
         if t == "range":
             lo, hi = r.get("min"), r.get("max")
+            if types[r["column"]] not in ("integer", "number"):
+                raise ValueError("A range check needs a number column.")
+            if any(v is not None and not _is_num(v) for v in (lo, hi)):
+                raise ValueError("The minimum and maximum must be numbers.")
             if lo is None and hi is None:
                 raise ValueError("Set a minimum, a maximum, or both.")
             if lo is not None and hi is not None and lo > hi:

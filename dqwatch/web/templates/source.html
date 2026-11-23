@@ -9,7 +9,7 @@
 <div class="card"><b>Checks</b>
   <table>
     <tr><th>Check</th><th>Severity</th><th>Recent runs (oldest → newest)</th><th></th></tr>
-    {% for sys in ['fetch', 'schema', 'duplicate_keys'] if sys in strips %}
+    {% for sys in ['fetch', 'load', 'schema', 'duplicate_keys', 'internal', 'email'] if sys in strips %}
     <tr><td class="muted">{{ sys }} (built in)</td><td class="muted">{{ strips[sys][-1].severity }}</td>
       <td><div class="strip">{% for h in strips[sys] %}<span class="{{ 'error-s' if h.status == 'error' else h.status }}" title="{{ h.at }} {{ h.detail }}"></span>{% endfor %}</div></td><td></td></tr>
     {% endfor %}

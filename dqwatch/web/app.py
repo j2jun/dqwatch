@@ -15,6 +15,7 @@ from dqwatch.models import Column, Source
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 FOLDER_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 SCHEDULES = {15: "Every 15 minutes", 60: "Every hour", 1440: "Every day"}
+BUILTIN_CHECKS = {"fetch", "load", "schema", "duplicate_keys", "internal", "email"}
 MODES = {"upsert": "Update by key", "append": "Append new rows", "replace": "Replace everything"}
 
 
@@ -79,10 +80,11 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
     def source_page(request, sid: int, error: str = ""):
         con = db()
         src = meta.get_source(con, sid)
-        history = meta.results_history(con, sid, 500)
+        live = BUILTIN_CHECKS | {r.get("id") for r in meta.list_rules(con, sid)}
         strips: dict[str, list[dict]] = {}
-        for h in reversed(history):
-            strips.setdefault(h["rule_id"], []).append(h)
+        for h in reversed(meta.results_history(con, sid, 500)):
+            if h["rule_id"] in live:  # results of removed checks stop counting
+                strips.setdefault(h["rule_id"], []).append(h)
         return page(request, "source.html", source=src, rules=meta.list_rules(con, sid),
                     strips={k: v[-30:] for k, v in strips.items()}, attention=meta.list_attention(con, sid)[:50],
                     error=error, modes=MODES, schedules=SCHEDULES, rule_types=sorted(rules.RULE_TYPES),
@@ -182,9 +184,11 @@ def create_app(meta_path: str, inbox_root: str, llm_cfg: llm.LlmConfig, complete
         return RedirectResponse(f"/sources/{sid}", status_code=303)
 
     def latest_by_rule(con, sid: int) -> dict[str, dict]:
+        live = BUILTIN_CHECKS | {r.get("id") for r in meta.list_rules(con, sid)}
         latest: dict[str, dict] = {}
         for h in meta.results_history(con, sid, 500):
-            latest.setdefault(h["rule_id"], h)
+            if h["rule_id"] in live:
+                latest.setdefault(h["rule_id"], h)
         return latest
 
     @app.get("/", response_class=HTMLResponse)

@@ -105,3 +105,15 @@ def test_schema_and_dup_results():
     assert "extra" in bad.detail and "amount" in bad.detail and "2" in bad.detail
     assert rules.duplicate_keys_result(StageReport([], [], 0, [], 3)).status == "fail"
     assert rules.duplicate_keys_result(ok).severity == "warn"
+
+
+@pytest.mark.parametrize("rule", [
+    {"type": "range", "column": "status", "min": 1},          # text column
+    {"type": "range", "column": "amount", "min": "abc"},      # non-numeric bound
+    {"type": "range", "column": "amount", "min": True},       # bool is not a number here
+    {"type": "freshness", "max_age_hours": True},
+    {"type": "row_count", "min": True},
+])
+def test_validate_rejects_bad_types(rule):
+    with pytest.raises(ValueError):
+        rules.validate_rule(rule, COLS)

@@ -80,6 +80,7 @@ def run_source(meta_con, duck_con, source_id: int, inbox_root: str, now: datetim
                 continue
             # --- this file is committed; nothing below may fail the run ---
             status = "loaded"
+            record(CheckResult("load", "pass", "error"))
             best_effort("Saving the file fingerprint", meta.record_fingerprint, meta_con, source_id, item, sha)
             for row in report.null_key_rows:
                 best_effort("Saving a needs-attention row", meta.add_attention, meta_con, source_id, batch_id,
@@ -100,11 +101,22 @@ def run_source(meta_con, duck_con, source_id: int, inbox_root: str, now: datetim
 
     newly_failing = [r for r, prev in results
                      if r.severity == "error" and r.status in ("fail", "error") and prev in (None, "pass")]
+    def clear(rule_id: str, severity: str):
+        """Record a pass for a built-in step that errored before, so it doesn't stay red forever."""
+        try:
+            if meta.last_status(meta_con, source_id, rule_id) not in (None, "pass"):
+                record(CheckResult(rule_id, "pass", severity))
+        except Exception:
+            pass
+
     if newly_failing and smtp:
         try:
             notify.send_alert(source.name, newly_failing, smtp, send=send)
+            clear("email", "warn")
         except Exception as e:
             record(CheckResult("email", "error", "warn", detail=f"Alert email failed: {e}"))
+    if not any(r.rule_id == "internal" for r, _ in results):
+        clear("internal", "warn")
 
     final = "load_failed" if load_error else status
     try:

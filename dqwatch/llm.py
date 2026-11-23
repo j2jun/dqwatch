@@ -52,7 +52,7 @@ def complete(messages: list[dict], cfg: LlmConfig, timeout: float = 60) -> str:
                  **({"Authorization": f"Bearer {cfg.api_key}"} if cfg.api_key else {})})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read())["choices"][0]["message"]["content"]
+            return json.loads(resp.read())["choices"][0]["message"].get("content") or ""
     except Exception as e:
         raise LlmUnavailable(str(e)) from e
 
@@ -70,7 +70,8 @@ def system_prompt(source: Source | None, rules_: list[dict], history: list[dict]
     return "\n\n".join(parts)
 
 
-def _first_json_array(text: str):
+def _first_json_array(text: str | None):
+    text = text or ""
     start = text.find("[")
     if start < 0:
         return []

@@ -185,3 +185,48 @@ def test_unreadable_file_alerts_once(env):
     for i in range(3):
         _run(env, now=NOW + timedelta(minutes=i), send=lambda m, c: sent.append(m))
     assert len(sent) == 1
+
+
+# --- final review fixes ---
+
+def test_load_error_clears_and_realerts(env, monkeypatch):
+    from dqwatch import load
+    real = load.load
+    sent = []
+
+    def boom(*a, **k):
+        raise RuntimeError("locked")
+    _drop(env, "a.csv", b"id,email,amount\n1,a@x.com,5\n")
+    monkeypatch.setattr(load, "load", boom)
+    with pytest.raises(RuntimeError):
+        _run(env, send=lambda m, c: sent.append(m))
+    monkeypatch.setattr(load, "load", real)
+    _run(env, now=NOW + timedelta(minutes=1), send=lambda m, c: sent.append(m))
+    assert _results(env, "load")[0]["status"] == "pass"
+    _drop(env, "a.csv", b"id,email,amount\n2,b@x.com,5\n")
+    monkeypatch.setattr(load, "load", boom)
+    with pytest.raises(RuntimeError):
+        _run(env, now=NOW + timedelta(minutes=2), send=lambda m, c: sent.append(m))
+    assert len(sent) == 2
+
+
+def test_internal_and_email_errors_clear(env, monkeypatch):
+    import sqlite3
+    real_fp = meta.record_fingerprint
+    monkeypatch.setattr(meta, "record_fingerprint",
+                        lambda *a, **k: (_ for _ in ()).throw(sqlite3.OperationalError("locked")))
+    meta.add_rule(env["meta"], env["sid"], {"type": "not_null", "column": "email", "severity": "error"})
+    _drop(env, "a.csv", b"id,email,amount\n1,,5\n")
+
+    def bad_send(m, c):
+        raise OSError("smtp down")
+    _run(env, send=bad_send)
+    assert _results(env, "internal")[0]["status"] == "error"
+    assert _results(env, "email")[0]["status"] == "error"
+    monkeypatch.setattr(meta, "record_fingerprint", real_fp)
+    _drop(env, "a.csv", b"id,email,amount\n2,b@x.com,5\n")
+    _run(env, now=NOW + timedelta(minutes=1))
+    _drop(env, "a.csv", b"id,email,amount\n3,,5\n")
+    _run(env, now=NOW + timedelta(minutes=2))
+    assert _results(env, "internal")[0]["status"] == "pass"
+    assert _results(env, "email")[0]["status"] == "pass"
